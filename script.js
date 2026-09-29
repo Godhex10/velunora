@@ -18,7 +18,7 @@ const byId = id => products.find(p => p.id === id);
 
 /* ---------- Product photography ----------
    Unbranded stock shots (Pexels / Unsplash licences allow free commercial use).
-   Swap these for the house's own product shots, e.g. Supabase storage URLs. */
+   Swap these for the store's own product shots, e.g. Supabase storage URLs. */
 const PHOTOS = {
   ambre:'u:photo-1588405748880-12d1d2a59f75',
   rose:'p:16266295',
@@ -90,8 +90,8 @@ ${liquid}${body}${hl}
 <rect x="${cp.x+5}" y="${cp.y+4}" width="4" height="${cp.h-10}" rx="2" fill="#fff" opacity=".35"/>
 <rect x="${lb.x}" y="${lb.y}" width="${lb.w}" height="${lb.h}" fill="#0f0c0a" stroke="#cfae78" stroke-width=".9"/>
 <rect x="${lb.x+3}" y="${lb.y+3}" width="${lb.w-6}" height="${lb.h-6}" fill="none" stroke="#cfae78" stroke-width=".4"/>
-<text x="100" y="${lb.y+lb.h*.48}" text-anchor="middle" font-family="Cormorant Garamond, serif" font-size="6.2" letter-spacing="1.1" fill="#e6cc9c">VELUNORA</text>
-<text x="100" y="${lb.y+lb.h*.72}" text-anchor="middle" font-family="Jost, sans-serif" font-size="4.2" letter-spacing="1.4" fill="#cfae78">${p.short}</text>
+<text x="100" y="${lb.y+lb.h*.48}" text-anchor="middle" font-family="Cormorant Garamond, serif" font-size="7" letter-spacing="1.4" fill="#e6cc9c">${p.short}</text>
+<text x="100" y="${lb.y+lb.h*.72}" text-anchor="middle" font-family="Jost, sans-serif" font-size="3.4" letter-spacing="1.2" fill="#cfae78">EAU DE PARFUM</text>
 </svg>`;
 }
 
@@ -119,9 +119,9 @@ $('#searchBtn').addEventListener('click', () => { $('#collection').scrollIntoVie
 
 /* ---------- Hero slides ---------- */
 const slides = [
-  {kicker:'Ambre Noir, extrait de parfum', title:'The art of / *quiet* luxury', text:'Smoked amber and Madagascan vanilla, blended in small batches and rested for 120 days before bottling.', price:85000, liquid:'#c8913f', glow:'rgba(207,160,90,.32)'},
+  {kicker:'Ambre Noir, extrait de parfum', title:'The art of / *quiet* luxury', text:'Smoked amber and Madagascan vanilla. A warm, long-lasting extrait and one of our most-loved picks.', price:85000, liquid:'#c8913f', glow:'rgba(207,160,90,.32)'},
   {kicker:'Rose Velours, limited edition', title:'Petals *wrapped* / in velvet', text:'Damask rose picked at dawn, softened with lychee and a clean white musk that lingers on fabric.', price:118000, liquid:'#e09a93', glow:'rgba(214,140,134,.3)'},
-  {kicker:'Oud Minuit, extrait', title:'Midnight / *oud* & saffron', text:'Aged agarwood, Iranian saffron and soft leather. Our richest blend, made for evenings out.', price:165000, liquid:'#7a3d1c', glow:'rgba(160,90,45,.34)'}
+  {kicker:'Oud Minuit, extrait', title:'Midnight / *oud* & saffron', text:'Aged agarwood, Iranian saffron and soft leather. The richest scent on our shelves, made for evenings out.', price:165000, liquid:'#7a3d1c', glow:'rgba(160,90,45,.34)'}
 ];
 let cur = 0, autoTimer;
 const copy = $('#heroCopy');
@@ -315,12 +315,31 @@ function card(p, i){
 }
 const track = $('#track');
 track.innerHTML = products.map(card).join('');
-$$('#track .card').forEach(c => c.classList.add('reveal'));
-const step = () => track.querySelector('.card').offsetWidth + 22;
-$('#cPrev').onclick = () => track.scrollBy({left:-step()});
-$('#cNext').onclick = () => track.scrollBy({left:step()});
+// reveal the carousel as a whole: cards off to the right would otherwise pop in one by one while scrolling
+track.closest('.carousel').classList.add('reveal');
+// move exactly one product per arrow press, smoothly, landing on a card edge
+const cards = () => [...track.children];
+const cardX = c => c.offsetLeft - track.firstElementChild.offsetLeft;
+const currentCard = () => { let best = 0, d = Infinity; cards().forEach((c, i) => { const dd = Math.abs(cardX(c) - track.scrollLeft); if (dd < d){ d = dd; best = i; } }); return best; };
+// own easing instead of native smooth scroll, which fights scroll-snap in some browsers
+let slideAnim = 0;
+const goCard = dir => {
+  const cs = cards(), i = Math.max(0, Math.min(cs.length - 1, currentCard() + dir));
+  const from = track.scrollLeft, to = Math.min(cardX(cs[i]), track.scrollWidth - track.clientWidth);
+  cancelAnimationFrame(slideAnim);
+  if (reduce || Math.abs(to - from) < 1){ track.scrollLeft = to; return; }
+  track.style.scrollSnapType = 'none'; track.style.scrollBehavior = 'auto';
+  const t0 = performance.now(), dur = 550, ease = k => k < .5 ? 4*k*k*k : 1 - Math.pow(-2*k + 2, 3) / 2;
+  const step = now => { const k = Math.min((now - t0) / dur, 1); track.scrollLeft = from + (to - from) * ease(k);
+    if (k < 1) slideAnim = requestAnimationFrame(step); else { track.style.scrollSnapType = ''; track.style.scrollBehavior = ''; } };
+  slideAnim = requestAnimationFrame(step);
+};
+track.addEventListener('pointerdown', () => { cancelAnimationFrame(slideAnim); track.style.scrollSnapType = ''; track.style.scrollBehavior = ''; }, {passive:true});
+$('#cPrev').onclick = () => goCard(-1);
+$('#cNext').onclick = () => goCard(1);
 function bar(){ const max = track.scrollWidth - track.clientWidth; const vis = track.clientWidth / track.scrollWidth;
-  const f = max > 0 ? track.scrollLeft / max : 1; $('#cBar').style.transform = `scaleX(${vis + (1-vis)*f})`; }
+  const f = max > 0 ? track.scrollLeft / max : 1; $('#cBar').style.transform = `scaleX(${vis + (1-vis)*f})`;
+  $('#cPrev').classList.toggle('off', track.scrollLeft < 4); $('#cNext').classList.toggle('off', track.scrollLeft > max - 4); }
 track.addEventListener('scroll', bar, {passive:true}); addEventListener('resize', bar); bar();
 
 /* ---------- Collection ---------- */
@@ -443,8 +462,8 @@ const io = new IntersectionObserver(entries => entries.forEach(en => {
   el.querySelectorAll('[data-count]').forEach(countUp);
 }), {threshold:.15, rootMargin:'0px 0px -40px 0px'});
 $$('.reveal, .split-h, #noteList').forEach(el => io.observe(el));
-function countUp(el){ const end = +el.dataset.count, suf = el.dataset.suffix || '', t0 = performance.now(), dur = 1800;
-  (function f(now){ const k = Math.min((now-t0)/dur, 1), e = 1 - Math.pow(1-k, 4); el.textContent = Math.round(end*e) + suf; if (k < 1) requestAnimationFrame(f); })(t0); }
+function countUp(el){ const end = +el.dataset.count, pre = el.dataset.prefix || '', suf = el.dataset.suffix || '', t0 = performance.now(), dur = 1800;
+  (function f(now){ const k = Math.min((now-t0)/dur, 1), e = 1 - Math.pow(1-k, 4); el.textContent = pre + Math.round(end*e) + suf; if (k < 1) requestAnimationFrame(f); })(t0); }
 
 /* ---------- Newsletter ---------- */
 $('#newsForm').addEventListener('submit', e => { e.preventDefault(); e.target.reset(); $('#newsOk').textContent = 'Subscribed. Your first letter arrives next month.'; });
